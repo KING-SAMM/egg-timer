@@ -11,6 +11,10 @@ import (
 	"gioui.org/widget/material"
 )
 
+// Constraints and Dimensions
+type C = layout.Context
+type D = layout.Dimensions
+
 
 func draw(w *app.Window) error {
 	// ops are the operations for the unit
@@ -22,56 +26,88 @@ func draw(w *app.Window) error {
 	// th defines the material design style
 	th := material.NewTheme(gofont.Collection())
 
-	// Constraints and Dimensions
-	type C = layout.Context
-	type D = layout.Dimensions
+	// is the egg boiling?
+	var boiling bool
 
   	// listen for events in the window.
-	for e := range w.Events() {
+	for {
+		select {
+			// Listen for events in the window
+			case e := <-w.Events():
+				// detect what type of event
+				switch e := e.(type) {
 
-		// detect what type of event
-		switch e := e.(type) {
+					// this is sent when the application should re-render.
+					case system.FrameEvent:
+						gtx := layout.NewContext(&ops, e)
 
-		// this is sent when the application should re-render.
-		case system.FrameEvent:
-			gtx := layout.NewContext(&ops, e)
-
-			// Flexbox layout
-			layout.Flex{
-				// Vertical alignment, from top to bottom
-				Axis: layout.Vertical,
-
-				// Empty space is lefr at the start, i.e at the top
-				Spacing: layout.SpaceStart,
-			}.Layout(
-				gtx,
-				layout.Rigid(
-					func(gtx C) D {
-						// ONE: First define margins around the button using layout.Inset ...
-						margins := layout.Inset{
-							Top:    unit.Dp(25),
-							Bottom: unit.Dp(25),
-							Right:  unit.Dp(35),
-							Left:   unit.Dp(35),
+						// Let's try out the flexbox layout concept
+						if startButton.Clicked() {
+							boiling = !boiling
 						}
-						// TWO: ...then we lay out those margins...
-						return margins.Layout(
+			
+						// Flexbox layout
+						layout.Flex{
+							// Vertical alignment, from top to bottom
+							Axis: layout.Vertical,
+			
+							// Empty space is lefr at the start, i.e at the top
+							Spacing: layout.SpaceStart,
+						}.Layout(
 							gtx,
-							// THREE: ...and finally within the margins, we define and lay out the button
-							func(gtx C) D {
-								btn := material.Button(th, &startButton, "Start")
-								return btn.Layout(gtx)
-							},
+			
+							// Progressbar
+							layout.Rigid(
+								func(gtx C) D {
+								bar := material.ProgressBar(th, progress)  // Here progress is used
+								return bar.Layout(gtx)
+								},
+							),
+			
+							// Button
+							layout.Rigid(
+								func(gtx C) D {
+									// ONE: First define margins around the button using layout.Inset ...
+									margins := layout.Inset{
+										Top:    unit.Dp(25),
+										Bottom: unit.Dp(25),
+										Right:  unit.Dp(35),
+										Left:   unit.Dp(35),
+									}
+									// TWO: ...then we lay out those margins...
+									return margins.Layout(
+										gtx,
+										// THREE: ...and finally within the margins, we define and lay out the button
+										func(gtx C) D {
+											var text string
+											if !boiling {
+												text = "Start"
+											} else {
+												text = "Stop"
+											}
+			
+											btn := material.Button(th, &startButton, text)
+											return btn.Layout(gtx)
+										},
+									)
+								},
+							),
 						)
-					},
-				),
-			)
-			e.Frame(gtx.Ops)
-
-		// this is sent when the application is closed.
-		case system.DestroyEvent:
-			return e.Err
+						e.Frame(gtx.Ops)
+			
+					// this is sent when the application is closed.
+					case system.DestroyEvent:
+						return e.Err
+				}
+				
+			// listen for events in the incrementor channel
+			case p := <-progressIncrementer:
+				if boiling && progress < 1 {
+					progress += p
+					w.Invalidate()
+				}
 		}
+				
 	}
-	return nil
 }
+
