@@ -9,12 +9,23 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
+	"image"
+	"image/color"
+	"gioui.org/op/clip"
+	"gioui.org/op/paint"
 )
 
 // Constraints and Dimensions
 type C = layout.Context
 type D = layout.Dimensions
 
+type Point struct {
+    X, Y float32
+}
+
+type Rectangle struct {
+    Min, Max Point
+}
 
 func draw(w *app.Window) error {
 	// ops are the operations for the unit
@@ -29,7 +40,6 @@ func draw(w *app.Window) error {
 	// is the egg boiling?
 	var boiling bool
 
-  	// listen for events in the window.
 	for {
 		select {
 			// Listen for events in the window
@@ -55,6 +65,24 @@ func draw(w *app.Window) error {
 							Spacing: layout.SpaceStart,
 						}.Layout(
 							gtx,
+
+							// Egg as Cirle
+							layout.Rigid(
+								func(gtx C) D {
+									circle := clip.Ellipse{
+										// Hard coding the x coordinate. Try resizing the window
+										Min: image.Pt(80, 0),
+										Max: image.Pt(320, 240),
+										// Soft coding the x coordinate. Try resizing the window
+										//Min: image.Pt(gtx.Constraints.Max.X/2-120, 0),
+										//Max: image.Pt(gtx.Constraints.Max.X/2+120, 240),
+									}.Op(gtx.Ops)
+									color := color.NRGBA{R: 200, A: 255}
+									paint.FillShape(gtx.Ops, color, circle)
+									d := image.Point{Y: 400}
+									return layout.Dimensions{Size: d}
+								},
+							),
 			
 							// Progressbar
 							layout.Rigid(
@@ -106,8 +134,7 @@ func draw(w *app.Window) error {
 					progress += p
 					w.Invalidate()
 				}
-		}
-				
+		}	
 	}
 }
 
