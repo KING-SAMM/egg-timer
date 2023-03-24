@@ -1,6 +1,12 @@
 package main
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+	"image"
+	"math"
+	"image/color"
 	"gioui.org/app"
 	"gioui.org/font/gofont"
 	"gioui.org/io/system"
@@ -9,12 +15,10 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
-	"image"
-	"image/color"
-	"math"
 	"gioui.org/f32"
-	"gioui.org/op/clip"
 	"gioui.org/op/paint"
+	"gioui.org/op/clip"
+	"gioui.org/text"
 )
 
 // Constraints and Dimensions
@@ -39,8 +43,12 @@ func draw(w *app.Window) error {
 	// th defines the material design style
 	th := material.NewTheme(gofont.Collection())
 
+	// boilDurationInput is a textfield to input boil duration
+	var boilDurationInput widget.Editor
+
 	// is the egg boiling?
 	var boiling bool
+	var boilDuration float32
 
 	for {
 		select {
@@ -56,6 +64,13 @@ func draw(w *app.Window) error {
 						// Let's try out the flexbox layout concept
 						if startButton.Clicked() {
 							boiling = !boiling
+
+							// Read from the input box
+							inputString := boilDurationInput.Text()
+							inputString = strings.TrimSpace(inputString)
+							inputFloat, _ := strconv.ParseFloat(inputString, 32)
+							boilDuration = float32(inputFloat)
+							boilDuration = boilDuration / (1 - progress)
 						}
 			
 						// Flexbox layout
@@ -68,7 +83,7 @@ func draw(w *app.Window) error {
 						}.Layout(
 							gtx,
 
-							// Egg as Cirle
+							// 1. Egg as Cirle
 							layout.Rigid(
 								func(gtx C) D {
 									// Draw a custom path, shaped like an egg
@@ -112,8 +127,48 @@ func draw(w *app.Window) error {
 									return layout.Dimensions{Size: d}
 								},
 							),
+
+							// 2. The inputbox
+							layout.Rigid(
+								func(gtx C) D {
+									// Wrap the editor in material design
+									ed := material.Editor(th, &boilDurationInput, "sec")
+
+									// Define characteristics of the input box
+									boilDurationInput.SingleLine = true
+									boilDurationInput.Alignment = text.Middle
+
+									if boiling && progress < 1 {
+										boilRemain := (1 - progress) * boilDuration
+										// Format to 1 decimal.
+										inputStr := fmt.Sprintf("%.1f", math.Round(float64(boilRemain)*10)/10)
+										// Update the text in the inputbox
+										boilDurationInput.SetText(inputStr)
+									}
+
+									// Define insets ...
+									margins := layout.Inset{
+										Top:    unit.Dp(0),
+										Right:  unit.Dp(170),
+										Bottom: unit.Dp(40),
+										Left:   unit.Dp(170),
+									}
+									// ... and borders ...
+									border := widget.Border{
+										Color:        color.NRGBA{R: 204, G: 204, B: 204, A: 255},
+										CornerRadius: unit.Dp(3),
+										Width:        unit.Dp(2),
+									}
+									// ... before laying it out, one inside the other
+									return margins.Layout(gtx,
+										func(gtx C) D {
+										return border.Layout(gtx, ed.Layout)
+										},
+									)
+								},
+							),
 			
-							// Progressbar
+							// 3. Progressbar
 							layout.Rigid(
 								func(gtx C) D {
 								bar := material.ProgressBar(th, progress)  // Here progress is used
@@ -139,8 +194,12 @@ func draw(w *app.Window) error {
 											var text string
 											if !boiling {
 												text = "Start"
-											} else {
+											}
+											if boiling && progress < 1 {
 												text = "Stop"
+											}
+											if boiling && progress >= 1 {
+												text = "Finished"
 											}
 			
 											btn := material.Button(th, &startButton, text)
